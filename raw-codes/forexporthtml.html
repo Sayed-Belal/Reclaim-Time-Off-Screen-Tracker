@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reclaim: The Off-Screen Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="https://img.icons8.com/?size=100&id=C4zqmxCbchPV&format=png&color=000000">
+    <style>
+        :root {
+            --primary: #3A82F7;
+            --surface: #fff;
+            --surface-dark: #181c23;
+            --border: #e9eef5;
+            --border-dark: #333a44;
+            --radius-lg: 32px;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+            --goal-bar-bg: #e4e8f1;
+            --goal-bar-bg-dark: #22293a;
+            --goal-bar-fill: #3A82F7;
+            --goal-bar-fill-dark: #7ab1ff;
+            --goal-bar-text: #254a7d;
+            --goal-bar-text-dark: #a0c4ff;
+            --progress-bar-fill: #3A82F7;
+            --page-bg: linear-gradient(90deg, #e3f0ff 0%, #f3f7fd 0%, #f6f8fa 0%);
+            --page-bg-dark: linear-gradient(90deg, #181f2a 0%, #232b39 100%);
+        }
+        html, body {
+            min-height: 100vh;
+            height: 100%;
+            font-family: var(--font);
+            margin: 0;
+            padding: 0;
+            background: var(--page-bg);
+            transition: background 0.4s;
+        }
+        body {
+            position: relative;
+            min-height: 100vh;
+        }
+        html.dark, body.dark {
+            background: var(--page-bg-dark) !important;
+            color: #e0e0e0 !important;
+        }
+        body.dark .container,
+        body.dark .inactive-card,
+        body.dark .active-card,
+        body.dark .chart-section,
+        body.dark .sleepwake-big-card,
+        body.dark .appbar {
+            background: transparent !important;
+        }
+        body.dark .main-title, body.dark .main-title span, body.dark .main-desc,
+        body.dark .inactive-label, body.dark .inactive-value, body.dark .goal-bar-percent,
+        body.dark .sleepwake-big-title,
+        body.dark .chart-title, body.dark .chart-subtitle, body.dark .streak-label, body.dark .streak-value {
+            color: #7ab1ff !important;
+        }
+        body.dark .inactive-desc, body.dark .active-desc, body.dark .goal-bar-label,
+        body.dark .sleepwake-big-row label, body.dark .footer {
+            color: #e0e0e0 !important;
+        }
+        body.dark .active-label, body.dark .active-value {
+            color: #6fcf97 !important;
+        }
+        body.dark input[type="date"],
+        body.dark input[type="time"],
+        body.dark input[type="number"] {
+            background: #232b39 !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
+        }
+        body.dark .btn.secondary {
+            background: #232b39 !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
+        }
+        .appbar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 26px 44px 18px 44px;
+            background: #fff;
+            box-shadow: 0 2px 20px rgba(66, 133, 244, 0.04);
+            border-bottom: 2px solid var(--border);
+            font-size: 1.32rem;
+            transition: background 0.4s;
+        }
+        .appbar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.32rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -1px;
+        }
+        .appbar-logo img {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            box-shadow: 0 2px 8px rgba(58,130,247,0.08);
+        }
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 40px 0;
+            position: relative;
+            z-index: 2;
+            transition: background 0.4s;
+        }
+        .main-title {
+            text-align: center;
+            font-size: 2.7rem;
+            font-weight: 900;
+            margin: 44px 0 10px 0;
+            letter-spacing: -1.2px;
+            color: #222d3b;
+        }
+        .main-title span {
+            color: var(--primary);
+        }
+        .main-desc {
+            text-align: center;
+            color: #6d6d6d;
+            font-size: 1.25rem;
+            margin-bottom: 26px;
+        }
+        .streak-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            margin-bottom: 26px;
+        }
+        .streak-item {
+            background: #e4f0ff;
+            color: #2563eb;
+            border-radius: 16px;
+            padding: 18px 36px;
+            font-weight: 900;
+            font-size: 1.08rem;
+            box-shadow: 0 2px 8px #3a82f73a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 160px;
+        }
+        .streak-label {
+            font-size: 1.02rem;
+            color: #28418a;
+            margin-bottom: 4px;
+        }
+        .streak-value {
+            font-size: 2.1rem;
+            color: #2362f1;
+            font-weight: 800;
+        }
+        body.dark .streak-item {
+            background: #232b39;
+            color: #91bfff;
+            box-shadow: 0 2px 8px #101c2b75;
+        }
+        body.dark .streak-label {
+            color: #a0bfff;
+        }
+        body.dark .streak-value {
+            color: #7ab1ff;
+        }
+        .halo-box {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 38px;
+        }
+        .halo-box::before {
+            content: "";
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: 430px;
+            height: 240px;
+            border-radius: 45%;
+            background: radial-gradient(circle at 50% 50%, #3A82F7 0%, #e3f0ff 0%, transparent 100%);
+            opacity: 0.23;
+            filter: blur(28px);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .inactive-card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 2px 10px #3a82f714;
+            border: 2.5px solid var(--border);
+            min-width: 370px;
+            width: 470px;
+            padding: 54px 38px 33px 38px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+            transition: background 0.4s;
+        }
+        .inactive-label {
+            font-size: 1.58rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        .inactive-value {
+            font-size: 4.3rem;
+            font-weight: 900;
+            font-family: monospace;
+            color: var(--primary);
+            letter-spacing: -3px;
+            margin-bottom: 10px;
+            line-height: 1.09;
+        }
+        .inactive-desc {
+            font-size: 1.18rem;
+            color: #6d6d6d;
+            margin-bottom: 16px;
+        }
+        .goal-bar-label {
+            font-size: 1.19rem;
+            color: var(--goal-bar-text);
+            margin-bottom: 10px;
+            font-weight: 700;
+            text-align: left;
+        }
+        body.dark .goal-bar-label {
+            color: var(--goal-bar-text-dark);
+        }
+        .goal-bar {
+            width: 100%;
+            height: var(--goal-bar-height);
+            border-radius: var(--goal-bar-radius);
+            background: var(--goal-bar-bg);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        body.dark .goal-bar {
+            background: var(--goal-bar-bg-dark);
+        }
+        .goal-bar-fill {
+            background: linear-gradient(90deg, var(--goal-bar-fill), #92baf6 100%);
+            height: 100%;
+            border-radius: var(--goal-bar-radius);
+            transition: width 0.7s cubic-bezier(.65,0,.35,1);
+        }
+        body.dark .goal-bar-fill {
+            background: linear-gradient(90deg, var(--goal-bar-fill-dark), #a0c4ff 100%);
+        }
+        .goal-bar-percent {
+            position: absolute;
+            right: 18px;
+            top: 0;
+            height: 100%;
+            font-size: 1.16rem;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+        }
+        .goal-edit-row {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+        }
+        .goal-edit-row label { font-size: 1.08rem; font-weight: 600; color: var(--goal-bar-text);}
+        body.dark .goal-edit-row label { color: #e0e0e0; }
+        .goal-edit-row input[type="number"],
+        .goal-edit-row input[type="date"] {
+            border: 1.3px solid #d0d7e6;
+            border-radius: 8px;
+            font-size: 1.08rem;
+            padding: 10px 11px;
+            background: #f4f7fc;
+            margin-left: 4px;
+        }
+        .goal-edit-row input[type="number"] { width: 70px; }
+        .goal-edit-row button {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 11px 22px;
+            font-size: 1.13rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 2px 10px #3a82f715;
+            transition: background .17s;
+        }
+        .goal-edit-row button:hover {
+            background: #256ddc;
+        }
+        .active-card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--surface-shadow);
+            border: 2px solid var(--border);
+            min-width: 290px;
+            width: 320px;
+            margin: 0 auto 38px auto;
+            padding: 36px 18px 22px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background 0.4s;
+        }
+        .active-label {
+            font-size: 1.28rem;
+            font-weight: 800;
+            color: #34A853;
+            margin-bottom: 11px;
+        }
+        .active-value {
+            font-size: 2.65rem;
+            font-weight: 900;
+            font-family: monospace;
+            color: #34A853;
+            letter-spacing: -1.6px;
+            margin-bottom: 7px;
+        }
+        .active-desc {
+            font-size: 1.10rem;
+            color: #6d6d6d;
+            margin-bottom: 6px;
+        }
+        .chart-section {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--surface-shadow);
+            border: 2px solid var(--border);
+            padding: 48px 48px 32px 48px;
+            margin-bottom: 38px;
+            max-width: 1200px;
+            margin: 0 auto 38px auto;
+            transition: background 0.4s;
+        }
+        .chart-title {
+            font-size: 1.44rem;
+            font-weight: 800;
+            color: var(--goal-bar-text);
+            margin-bottom: 7px;
+        }
+        .chart-subtitle {
+            font-size: 1.09rem;
+            color: var(--goal-bar-text);
+            margin-bottom: 14px;
+        }
+        .chart-container {
+            position: relative;
+            min-height: 340px;
+            height: 400px;
+            margin-bottom: 16px;
+        }
+        .actions-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 6px;
+            margin-top: 16px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 1.09rem;
+            font-weight: 600;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px #3a82f72a;
+            transition: background .17s, transform .14s, box-shadow .16s;
+            flex-direction: column;
+        }
+        .btn.secondary {
+            background: #ececec;
+            color: #222d3b;
+            box-shadow: none;
+            border: 1.1px solid #e7e7e7;
+        }
+        .btn:hover {
+            background: #589bf9;
+            transform: translateY(-1.5px) scale(1.04);
+        }
+        .btn.secondary:hover {
+            background: #f7f7f7;
+            color: var(--primary);
+        }
+        .sleepwake-big-card {
+            background: var(--surface);
+            border-radius: 30px;
+            box-shadow: var(--surface-shadow);
+            border: 2.5px solid var(--border);
+            max-width: 570px;
+            margin: 0 auto 38px auto;
+            padding: 36px 32px 32px 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            transition: background 0.4s;
+        }
+        .sleepwake-big-title {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .sleepwake-big-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+        .sleepwake-big-row label {
+            font-size: 1.12rem;
+            font-weight: 700;
+            color: var(--goal-bar-text);
+        }
+        .sleepwake-big-row input[type="date"] {
+            font-size: 1.12rem;
+            border-radius: 10px;
+            border: 1.3px solid #d0d7e6;
+            background: #f4f7fc;
+            padding: 12px 16px;
+            font-family: inherit;
+            font-weight: 700;
+            text-align: center;
+        }
+        .sleepwake-big-row input[type="time"] {
+            font-size: 1.1rem;
+            border-radius: 10px;
+            border: 1.3px solid #d0d7e6;
+            background: #f4f7fc;
+            padding: 10px 14px;
+            font-family: inherit;
+            font-weight: 600;
+            text-align: center;
+        }
+        .sleepwake-big-btn {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 13px 0;
+            font-size: 1.15rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 2px 10px #3a82f715;
+            transition: background .17s;
+            width: 100%;
+            margin-top: 12px;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+        .sleepwake-big-btn:hover {
+            background: #256ddc;
+        }
+        .footer {
+            text-align: center;
+            color: #6d6d6d;
+            font-size: 1.05rem;
+            padding: 32px 0 20px 0;
+            margin-top: auto;
+        }
+        .footer span { color: var(--primary); }
+        @media (max-width: 1200px) {
+            .container { padding: 18px; }
+            .inactive-card, .active-card, .chart-section { max-width: 98vw; }
+        }
+        @media (max-width: 900px) {
+            .container { padding: 8px;}
+            .inactive-card, .active-card, .chart-section { width: 95vw; min-width: unset; }
+            .sleepwake-big-card { max-width: 98vw; }
+        }
+        @media (max-width: 650px) {
+            .container { padding: 4px;}
+            .inactive-card, .active-card, .chart-section, .settings-card { width: 99vw; min-width: unset; padding: 10px; }
+            .halo-box::before { width: 98vw; height: 90vw; }
+            .sleepwake-big-card { max-width: 99vw; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="appbar">
+        <div class="appbar-logo">
+            <img src="https://img.icons8.com/?size=100&id=C4zqmxCbchPV&format=png&color=000000" alt="Apps">
+            Reclaim: The Off-Screen Tracker
+        </div>
+        <div style="margin-left:auto;">
+            <button id="darkModeToggle" class="btn secondary" style="font-size: 0.9rem; padding: 6px 12px;">Toggle Dark Mode</button>
+        </div>
+    </div>
+    <div class="container">
+        <div class="main-title">
+            How long <span>were you inactive</span> today?
+        </div>
+        <div class="main-desc">
+            See your <b>time off-screen</b>. It isn’t about quitting tech; it’s about finding time for you again.
+        </div>
+        <!-- Streak Box -->
+        <div class="streak-box">
+            <div class="streak-item">
+                <div class="streak-label">Current Streak</div>
+                <div class="streak-value" id="currentStreakVal">--</div>
+                <div style="font-size:1.1rem;">days</div>
+            </div>
+            <div class="streak-item">
+                <div class="streak-label">Highest Streak</div>
+                <div class="streak-value" id="highestStreakVal">--</div>
+                <div style="font-size:1.1rem;">days</div>
+            </div>
+        </div>
+        <div class="halo-box">
+            <div class="inactive-card">
+                <div class="inactive-label">Inactive Time Today</div>
+                <div class="inactive-value" id="inactiveTimeVal">--:--:--</div>
+                <div class="inactive-desc">Hours not using any app since wake-up</div>
+                <div class="goal-bar-label">Progress towards daily goal (<span id="goalHoursLabel">4</span> hrs)</div>
+                <div class="goal-bar" id="goalBar">
+                    <div class="goal-bar-fill" id="goalBarFill" style="width:0"></div>
+                    <div class="goal-bar-percent" id="goalBarPercent">0%</div>
+                </div>
+                <div class="goal-edit-row">
+                    <label for="goalDate">Goal for date:</label>
+                    <input type="date" id="goalDate">
+                    <label for="goalHours">Hours:</label>
+                    <input type="number" id="goalHours" min="0.5" max="24" step="0.5" value="4">
+                    <button onclick="saveGoal()">Set Goal</button>
+                </div>
+            </div>
+        </div>
+        <div class="active-card">
+            <div class="active-label">Active Time Today</div>
+            <div class="active-value" id="activeTimeVal">--:--:--</div>
+            <div class="active-desc">Hours using any app today</div>
+        </div>
+        <div class="chart-section">
+            <div class="chart-title">Your Daily Inactivity Trend</div>
+            <div class="chart-subtitle">See how your inactive & active time changes over recent days</div>
+            <div class="chart-container">
+                <canvas id="dailyUsageChart"></canvas>
+            </div>
+            <div class="actions-row">
+                <button class="btn" id="exportCsvBtn">Export CSV</button>
+                <button class="btn secondary" id="exportGraphBtn">Save Chart</button>
+                <button class="btn" id="shareTwitterBtn">Share on X/Twitter</button>
+            </div>
+        </div>
+        <!-- Sleep/wake big card at bottom, restored size and improved layout -->
+        <div class="sleepwake-big-card">
+            <div class="sleepwake-big-title">Change your wake up and sleep time</div>
+            <div class="sleepwake-big-row">
+                <label for="sleepWakeDate">For date:</label>
+                <input type="date" id="sleepWakeDate" style="font-weight:900;">
+            </div>
+            <div class="sleepwake-big-row">
+                <label for="wakeTime">Wake-up:</label>
+                <input type="time" id="wakeTime" value="06:00">
+                <label for="sleepTime">Sleep:</label>
+                <input type="time" id="sleepTime" value="23:00">
+            </div>
+            <button class="sleepwake-big-btn" onclick="saveSleepWake()">Set Times</button>
+        </div>
+    </div>
+    <div class="footer">
+        &copy; 2025 Reclaim: The Off-Screen Tracker &mdash; <span>Your time, your control.</span>
+<div class="footer">
+        Crafted by Sayed Belal Mudassar</span>
+
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let dailyUsageChart;
+        let userGoals = {};
+        let todayDate = (new Date()).toISOString().slice(0,10);
+        let sleepWakeTimes = {};
+        let streakLoaded = false;
+
+        function formatHMS(s) {
+            let h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+        }
+        function updateGoalBar(awaySeconds, goalHours) {
+            let goalSecs = goalHours * 3600;
+            let percent = Math.min((awaySeconds/goalSecs)*100, 100);
+            document.getElementById('goalBarFill').style.width = `${percent}%`;
+            document.getElementById('goalBarPercent').textContent = `${Math.floor(percent)}%`;
+            document.getElementById('goalHoursLabel').textContent = goalHours;
+        }
+        function getGoalForDate(date) {
+            return userGoals[date] || 4;
+        }
+        async function fetchGoals() {
+            try {
+                const res = await fetch('/get_goals');
+                userGoals = await res.json();
+            } catch {}
+            document.getElementById('goalDate').value = todayDate;
+            document.getElementById('goalHours').value = getGoalForDate(todayDate);
+        }
+        async function fetchSleepWakeTimes() {
+            try {
+                const res = await fetch('/get_sleepwake_times');
+                sleepWakeTimes = await res.json();
+            } catch {}
+            document.getElementById('sleepWakeDate').value = todayDate;
+            document.getElementById('wakeTime').value = sleepWakeTimes[todayDate]?.wake || "06:00";
+            document.getElementById('sleepTime').value = sleepWakeTimes[todayDate]?.sleep || "23:00";
+        }
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/status');
+                const d = await res.json();
+                animateValue(document.getElementById("inactiveTimeVal"), d.inactive_time_seconds, 800, s=>formatHMS(Math.round(s)));
+                animateValue(document.getElementById("activeTimeVal"), d.active_time_seconds, 800, s=>formatHMS(Math.round(s)));
+                let goalHours = getGoalForDate(todayDate);
+                updateGoalBar(d.inactive_time_seconds, goalHours);
+
+                if (d.insights) {
+                    // Streak UI
+                    document.getElementById("currentStreakVal").textContent = d.insights.current_streak ?? "--";
+                    document.getElementById("highestStreakVal").textContent = d.insights.highest_streak ?? "--";
+                }
+            } catch (e) {
+                document.getElementById("inactiveTimeVal").textContent = "--:--:--";
+                document.getElementById("activeTimeVal").textContent = "--:--:--";
+                updateGoalBar(0, getGoalForDate(todayDate));
+                document.getElementById("currentStreakVal").textContent = "--";
+                document.getElementById("highestStreakVal").textContent = "--";
+            }
+        }
+        async function saveGoal() {
+            let date = document.getElementById('goalDate').value;
+            let hours = parseFloat(document.getElementById('goalHours').value);
+            if (!date || isNaN(hours) || hours < 0.5 || hours > 24) return alert("Set a valid date and goal (0.5-24 hrs)");
+            try {
+                const res = await fetch('/save_goal', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({date: date, hours: hours})
+                });
+                if (res.ok) {
+                    userGoals[date] = hours;
+                    alert("Goal saved!");
+                } else {
+                    alert("Failed to save goal.");
+                }
+            } catch {
+                alert("Failed to save goal.");
+            }
+        }
+        document.getElementById('goalDate').addEventListener('change', function() {
+            let date = this.value;
+            document.getElementById('goalHours').value = getGoalForDate(date);
+        });
+        async function saveSleepWake() {
+            let date = document.getElementById('sleepWakeDate').value;
+            let wake = document.getElementById('wakeTime').value;
+            let sleep = document.getElementById('sleepTime').value;
+            if (!date || !wake || !sleep) return alert("Please set date, wake-up, and sleep times.");
+            try {
+                const res = await fetch('/save_sleepwake_times', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({date, wake, sleep})
+                });
+                if (res.ok) {
+                    sleepWakeTimes[date] = {wake, sleep};
+                    alert("Wake/sleep times saved!");
+                    fetchStatus();
+                    fetchHistorical();
+                } else {
+                    alert("Failed to save times.");
+                }
+            } catch {
+                alert("Failed to save times.");
+            }
+        }
+        document.getElementById('sleepWakeDate').addEventListener('change', function() {
+            let date = this.value;
+            document.getElementById('wakeTime').value = sleepWakeTimes[date]?.wake || "06:00";
+            document.getElementById('sleepTime').value = sleepWakeTimes[date]?.sleep || "23:00";
+        });
+        function animateValue(el, to, duration=1000, formatFn=(v)=>v) {
+            const from = +el.dataset.prev || 0;
+            const start = performance.now();
+            const diff = to - from;
+            function step(now) {
+                const p = Math.min(1, (now-start)/duration);
+                const val = from + diff * p;
+                el.textContent = formatFn(val);
+                if (p < 1) requestAnimationFrame(step);
+                else el.dataset.prev = to;
+            }
+            requestAnimationFrame(step);
+        }
+        function updateChart(historicalData, isDark = false) {
+            const labels = [];
+            const inactiveData = [];
+            const activeData = [];
+            Object.keys(historicalData).sort().forEach(date => {
+                labels.push(new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                const inactiveSecs = historicalData[date].inactive_seconds || 0;
+                const activeSecs = historicalData[date].active_seconds || 0;
+                inactiveData.push((inactiveSecs/3600).toFixed(2));
+                activeData.push((activeSecs/3600).toFixed(2));
+            });
+            if (dailyUsageChart) {
+                dailyUsageChart.destroy();
+            }
+            const ctx = document.getElementById('dailyUsageChart').getContext('2d');
+            dailyUsageChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Inactive Time (hrs)',
+                            data: inactiveData,
+                            backgroundColor: isDark ? 'rgba(122,177,255,0.80)' : 'rgba(58,130,247,0.75)',
+                            borderRadius: 9,
+                            borderSkipped: false,
+                            maxBarThickness: 40,
+                        },
+                        {
+                            label: 'Active Time (hrs)',
+                            data: activeData,
+                            backgroundColor: isDark ? 'rgba(111,207,151,0.60)' : 'rgba(52,168,83,0.60)',
+                            borderRadius: 9,
+                            borderSkipped: false,
+                            maxBarThickness: 40,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: isDark ? '#e0e0e0' : '#222'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: isDark ? '#222' : '#fff',
+                            titleColor: isDark ? '#fff' : '#000',
+                            bodyColor: isDark ? '#fff' : '#000',
+                            bodyFont: { weight: 600, size: 18 },
+                            cornerRadius: 9,
+                            padding: 18
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: { color: isDark ? '#444' : '#ddd' },
+                            ticks: { color: isDark ? '#e0e0e0' : '#222', font: { size: 19 } }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            max: 18,
+                            ticks: {
+                                stepSize: 3,
+                                font: { size: 18 },
+                                color: isDark ? '#e0e0e0' : '#222'
+                            },
+                            grid: { color: isDark ? '#444' : '#ddd' }
+                        }
+                    }
+                }
+            });
+        }
+        document.getElementById('exportCsvBtn').addEventListener('click', async () => {
+            const res = await fetch('/historical_status');
+            const data = await res.json();
+            let csv = "Date,Inactive Time (Hours),Active Time (Hours)\n";
+            Object.keys(data).sort().forEach(date => {
+                const inactive = (data[date].inactive_seconds/3600).toFixed(2);
+                const active = (data[date].active_seconds/3600).toFixed(2);
+                csv += `${date},${inactive},${active}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'all_apps_usage_data.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+        document.getElementById('exportGraphBtn').addEventListener('click', () => {
+            if (dailyUsageChart) {
+                const url = dailyUsageChart.toBase64Image('image/png', 1.0);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'all_apps_usage_chart.png';
+                a.click();
+            }
+        });
+        document.getElementById('shareTwitterBtn').addEventListener('click', async () => {
+            const res = await fetch('/status');
+            const data = await res.json();
+            const tweet = `I've spent ${data.inactive_time_formatted} inactive today! Track your off-screen time with Reclaim: The Off-Screen Tracker. 
+#ReclaimTheOffScreenTracker #FocusTracker`;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
+        });
+
+        // DARK MODE
+        document.getElementById('darkModeToggle').addEventListener('click', function() {
+            document.body.classList.toggle('dark');
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.body.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark);
+            // Update chart colors
+            fetch('/historical_status')
+                .then(res => res.json())
+                .then(data => updateChart(data, isDark));
+        });
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchGoals().then(fetchStatus);
+            fetchSleepWakeTimes();
+            setInterval(fetchStatus, 5000);
+            // Chart data polling
+            async function fetchHistorical() {
+                try {
+                    const res = await fetch('/historical_status');
+                    const historicalData = await res.json();
+                    const isDark = document.body.classList.contains('dark');
+                    updateChart(historicalData, isDark);
+                } catch(e){}
+            }
+            fetchHistorical();
+            setInterval(fetchHistorical, 12000);
+
+            // Initial dark mode setup
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            if (isDark) {
+                document.body.classList.add('dark');
+                document.documentElement.classList.add('dark');
+            }
+            fetch('/historical_status')
+                .then(res => res.json())
+                .then(data => updateChart(data, isDark));
+        });
+
+        // To completely disable dark mode: 
+        // Remove or comment out the darkModeToggle button, 
+        // and remove or comment out all lines that add/remove/inspect the 'dark' class on body or documentElement.
+        // Also, you may remove all CSS under body.dark, html.dark
+    </script>
+</body>
+</html>
