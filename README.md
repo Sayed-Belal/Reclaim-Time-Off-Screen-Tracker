@@ -6,7 +6,8 @@ Track Less of What Distracts You. Celebrate What Resets You. Unlike traditional 
 
 Whether you want to download the ready-to-run `.exe` or dive into the raw code, this guide will help you get started.
 
-<img width="1898" height="905" alt="image" src="https://github.com/user-attachments/assets/c5d20fde-343b-4117-9511-9910ea48db22" />
+<img width="1883" height="872" alt="image" src="https://github.com/user-attachments/assets/c562f277-6137-4c2b-834c-53e6a0cc5f6e" />
+
 
 
 ---
