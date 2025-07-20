@@ -341,7 +341,7 @@ def index():
         base_path = sys._MEIPASS
     else:
         base_path = os.path.abspath(".")
-    return send_from_directory(base_path, 'forexporthtml.html')
+    return send_from_directory(base_path, 'reclaimtrackerhtml.html')
 
 @app.route("/status")
 def status():
