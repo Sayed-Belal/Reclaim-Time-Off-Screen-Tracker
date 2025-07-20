@@ -1,8 +1,8 @@
 ---
 
-# **🖥️ Welcome to ScreenTime Tracker (MVP)**
+# **🖥️ Welcome to Reclaim: The Off-Screen Time Tracker (MVP)**
 
-A minimalist productivity tool that rewards you not for time spent at your computer—but for stepping away from it.
+Track Less of What Distracts You. Celebrate What Resets You. Unlike traditional screen-time trackers that measure only how long you stay online, this app flips the narrative: It highlights how long you've been offline, idle, or consciously away from your device.
 
 Whether you want to download the ready-to-run `.exe` or dive into the raw code, this guide will help you get started.
 
@@ -13,7 +13,7 @@ Whether you want to download the ready-to-run `.exe` or dive into the raw code, 
 ✅ It highlights time spent **away** from your screen  
  ✅ Tracks passive inactivity as a measure of focus and wellness  
  ✅ Gives you achievements and streaks for disconnecting  
- ✅ All data stays on your device — no accounts, no cloud
+ ✅ All data stays on your device — no accounts, no cloud, and absolutely no data about your activity gets sent to us
 
 ---
 
